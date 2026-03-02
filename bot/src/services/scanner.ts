@@ -74,19 +74,15 @@ export async function runConfirmScan(
       if (klines.length < 30) continue;
 
       const rsiValues = Indicators.rsi(klines, 14);
-      const adxValues = Indicators.adx(klines, 14);
-
       const currentRSI = rsiValues[rsiValues.length - 1];
-      const currentADX = adxValues[adxValues.length - 1];
 
-      if (
-        isNaN(currentRSI) || isNaN(currentADX) ||
-        currentRSI < config.rsiMin || currentRSI > config.rsiMax ||
-        currentADX < config.adxMin
-      ) {
+      // ADX removed — was bottleneck for low-liquidity altcoins (always ranging)
+      // EMA cross on 15m provides trend confirmation instead
+      if (isNaN(currentRSI) || currentRSI < config.rsiMin || currentRSI > config.rsiMax) {
         await binance.sleep(150);
         continue;
       }
+      const currentADX = 0; // kept in WatchlistEntry for logging only
 
       // Order book imbalance
       const ob = await binance.getOrderBook(candidate.symbol, 50);
@@ -98,7 +94,7 @@ export async function runConfirmScan(
       // Score: 0–10
       let score = 0;
       if (currentRSI >= 45 && currentRSI <= 65) score += 3; else score += 1;
-      if (currentADX > 30) score += 3; else if (currentADX > 20) score += 2;
+      // ADX score removed
       if (Math.abs(imbalance) > 0.15) score += 2; else if (Math.abs(imbalance) > 0.05) score += 1;
       if (candidate.volumeRatio > 4) score += 2; else if (candidate.volumeRatio > 2) score += 1;
 
