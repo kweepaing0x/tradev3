@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   logger.info('║   BINANCE FUTURES AUTO-TRADING BOT     ║');
   logger.info('╚════════════════════════════════════════╝');
   logger.info(`Mode:       ${config.dryRun ? 'DRY RUN (no real orders)' : '🔴 LIVE TRADING'}`);
-  logger.info(`Base URL:   ${config.baseUrl}`);
+  logger.info(`Base URL:   ${config.scanBaseUrl}`);
   logger.info(`Margin:     $${config.marginUsdt} × ${config.leverage}x`);
   logger.info(`TP/SL:      ${config.tpPercent}% / ${config.slPercent}%`);
   logger.info(`Half-close: ${config.halfClosePercent}%`);

@@ -10,7 +10,7 @@ import type { VolumeScanResult, ConfirmedCandidate, WatchlistEntry } from '../ty
 
 export async function runVolumeScan(): Promise<VolumeScanResult[]> {
   logger.info('=== Phase 1: Volume spike scan (5m) ===');
-  const symbols = await binance.getExchangeInfo();
+  const symbols = await binance.getSymbols();
   logger.info(`Scanning ${symbols.length} USDT futures pairs...`);
 
   const results: VolumeScanResult[] = [];
@@ -20,7 +20,7 @@ export async function runVolumeScan(): Promise<VolumeScanResult[]> {
     const batch = symbols.slice(i, i + BATCH);
 
     await Promise.allSettled(
-      batch.map(async (symbol) => {
+      batch.map(async (symbol: string) => {
         try {
           const klines = await binance.getKlines(symbol, '5m', 50);
           if (klines.length < 25) return;

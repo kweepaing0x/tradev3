@@ -26,7 +26,7 @@ class BinanceClient {
 
   protected sign(params: Record<string, string | number>): string {
     const qs = new URLSearchParams(
-      Object.entries(params).map(([k, v]) => [k, String(v)])
+      Object.entries(params).map(([k, v]) => [k, String(v)] as [string, string])
     ).toString();
     return crypto.createHmac('sha256', this.apiSecret).update(qs).digest('hex');
   }
@@ -38,7 +38,7 @@ class BinanceClient {
 
   protected toForm(params: Record<string, string | number>): URLSearchParams {
     return new URLSearchParams(
-      Object.entries(params).map(([k, v]) => [k, String(v)])
+      Object.entries(params).map(([k, v]) => [k, String(v)] as [string, string])
     );
   }
 

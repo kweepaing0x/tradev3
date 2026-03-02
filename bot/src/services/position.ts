@@ -191,6 +191,7 @@ class PositionManager {
     const elapsed = Date.now() - this.position.openedAt;
     if (elapsed > ENTRY_FILL_TIMEOUT_MINUTES * 60 * 1000) {
       logger.warn(`Entry limit order not filled after ${ENTRY_FILL_TIMEOUT_MINUTES}min — cancelling`);
+      const timedOutSymbol = this.position.symbol;
       await tradeClient.cancelOrder(this.position.symbol, this.position.entryOrderId);
       await tradeClient.cancelAllOrders(this.position.symbol); // also cancel TP/SL
       this.position = null;
@@ -198,7 +199,7 @@ class PositionManager {
       await telegram.send(
         `⏰ <b>Entry Cancelled</b>\n` +
         `Limit order not filled within ${ENTRY_FILL_TIMEOUT_MINUTES} minutes\n` +
-        `Symbol: ${this.position?.symbol ?? 'N/A'}\nResuming scan cycle`
+        `Symbol: ${timedOutSymbol}\nResuming scan cycle`
       );
       return 'CANCELLED';
     }
