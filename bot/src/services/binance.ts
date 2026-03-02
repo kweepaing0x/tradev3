@@ -356,6 +356,24 @@ class TradeClient extends BinanceClient {
       return null;
     }
   }
+
+  /**
+   * Fetch ALL open positions across the entire account.
+   * Returns full raw Binance position objects for syncing.
+   */
+  async getAllPositions(): Promise<any[]> {
+    if (config.dryRun) return [];
+    try {
+      const { data } = await this.http.get(
+        '/fapi/v2/positionRisk',
+        { params: this.signed({}) }
+      );
+      return data.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+    } catch (err) {
+      logger.error(`getAllPositions failed: ${err}`);
+      return [];
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -50,6 +50,10 @@ async function runScanCycle(): Promise<void> {
   logger.info('════════════════════════════════════════');
 
   try {
+    // ── Re-sync with Binance at start of every cycle ────────────
+    // Catches any positions opened manually between cycles
+    await positionManager.syncFromExchange();
+
     // ── If position is open, skip scanning entirely ───────────────
     if (positionManager.hasPosition()) {
       const pos = positionManager.get()!;
@@ -185,7 +189,12 @@ async function main(): Promise<void> {
     `Watchlist: ${watchlist.count()} pairs`
   );
 
-  // If a position was open before restart, resume monitoring
+  // ── Sync with Binance live account ──────────────────────────────
+  // Fetches any open positions not tracked locally (e.g. manually opened,
+  // or bot restarted after crash before position.json was written).
+  await positionManager.syncFromExchange();
+
+  // If a position was open before restart (or just synced), resume monitoring
   if (positionManager.hasPosition()) {
     const pos = positionManager.get()!;
     logger.info(`Resuming monitor for existing position: ${pos.direction} ${pos.symbol}`);

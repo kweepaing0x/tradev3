@@ -63,6 +63,114 @@ class PositionManager {
     return this.position !== null;
   }
 
+  // ── Sync from Binance on startup ──────────────────────────────────
+  // Fetches all open positions from the live account.
+  // If one is found and no local position.json exists, reconstructs
+  // the position state so the bot can monitor it correctly.
+
+  async syncFromExchange(): Promise<void> {
+    if (config.dryRun) {
+      logger.info('Sync skipped — DRY RUN mode');
+      return;
+    }
+
+    // If we already have a local position saved, trust it
+    if (this.position) {
+      logger.info(`Local position found: ${this.position.direction} ${this.position.symbol} — skipping sync`);
+      return;
+    }
+
+    logger.info('Checking Binance for existing open positions...');
+
+    try {
+      const openPositions = await tradeClient.getAllPositions();
+
+      if (!openPositions.length) {
+        logger.info('No open positions found on Binance — starting fresh');
+        return;
+      }
+
+      // Take the first open position (bot only handles one at a time)
+      const raw = openPositions[0];
+      const symbol    = raw.symbol as string;
+      const posAmt    = parseFloat(raw.positionAmt);
+      const entryPrice = parseFloat(raw.entryPrice);
+      const direction: Direction = posAmt > 0 ? 'LONG' : 'SHORT';
+      const quantity  = Math.abs(posAmt);
+      const isLong    = direction === 'LONG';
+
+      // Get symbol precision info
+      const info = await scanClient.getSymbolInfo(symbol);
+      const pricePrecision    = info?.pricePrecision    ?? 4;
+      const quantityPrecision = info?.quantityPrecision ?? 3;
+
+      // Reconstruct TP / SL / half-close based on config percentages
+      const tpPrice     = parseFloat((entryPrice * (1 + (isLong ? 1 : -1) * config.tpPercent / 100)).toFixed(pricePrecision));
+      const slPrice     = parseFloat((entryPrice * (1 - (isLong ? 1 : -1) * config.slPercent / 100)).toFixed(pricePrecision));
+      const halfCloseAt = parseFloat((entryPrice * (1 + (isLong ? 1 : -1) * config.halfClosePercent / 100)).toFixed(pricePrecision));
+
+      this.position = {
+        symbol,
+        direction,
+        entryPrice,
+        quantity,
+        margin:       config.marginUsdt,
+        leverage:     config.leverage,
+        tpPrice,
+        slPrice,
+        halfCloseAt,
+        halfClosed:   false,
+        openedAt:     Date.now(),
+        pricePrecision,
+        quantityPrecision,
+        // No order IDs since we didn't place these orders
+        entryOrderId: undefined,
+        tpOrderId:    undefined,
+        slOrderId:    undefined,
+      };
+      this.save();
+
+      const msg =
+        `🔄 <b>Position Synced from Binance</b>
+
+` +
+        `Symbol: <b>${symbol}</b>
+` +
+        `Direction: <b>${direction}</b>
+` +
+        `Entry: $${entryPrice.toFixed(pricePrecision)}
+` +
+        `Qty: ${quantity}
+` +
+        `TP (calc): $${tpPrice.toFixed(pricePrecision)} (+${config.tpPercent}%)
+` +
+        `SL (calc): $${slPrice.toFixed(pricePrecision)} (-${config.slPercent}%)
+` +
+        `Half-close at: $${halfCloseAt.toFixed(pricePrecision)} (+${config.halfClosePercent}%)
+
+` +
+        `⚠️ TP/SL prices are calculated — verify they match your exchange orders`;
+
+      await telegram.send(msg);
+      logger.info(`Synced position: ${direction} ${symbol} @ $${entryPrice} | TP=$${tpPrice} SL=$${slPrice}`);
+
+      if (openPositions.length > 1) {
+        logger.warn(`Found ${openPositions.length} open positions — only monitoring ${symbol}. Close others manually.`);
+        await telegram.send(
+          `⚠️ <b>Multiple positions detected</b>
+` +
+          `Bot only monitors one position at a time.
+` +
+          `Currently tracking: ${symbol}
+` +
+          `Please close other positions manually.`
+        );
+      }
+    } catch (err) {
+      logger.error(`syncFromExchange failed: ${err}`);
+    }
+  }
+
   // ── Open position with limit order ─────────────────────────────
 
   async open(params: {
